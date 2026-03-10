@@ -49,7 +49,7 @@ bin_SCRIPTS = start-bfgminer.sh
 endif
 
 # first, our own stuff
-bfgminer_LDADD    = lib/libgnu.a ccan.bfg/libccan.a
+bfgminer_LDADD    = lib/libgnu.a
 bfgminer_LDFLAGS  =
 bfgminer_CPPFLAGS = -I$(top_builddir)/lib -I$(top_srcdir)/lib -I$(top_srcdir)/ccan-upstream
 

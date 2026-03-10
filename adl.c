@@ -48,10 +48,8 @@
 
 bool adl_active;
 bool opt_reorder = false;
-
-static
-const int opt_targettemp = 75;
-const int opt_overheattemp = 85;
+int opt_targettemp = 75;
+int opt_overheattemp = 85;
 static pthread_mutex_t adl_lock;
 
 struct gpu_adapters {

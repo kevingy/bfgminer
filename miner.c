@@ -61,7 +61,7 @@
 #include <dbt.h>
 #define HAVE_BFG_HOTPLUG
 #endif
-#include <ccan/opt/opt.h>
+#include <getopt.h>
 #include <jansson.h>
 #include <curl/curl.h>
 #include <libgen.h>
@@ -3043,12 +3043,19 @@ void bfg_versioninfo(void)
 	printf("  Options:%s\n", BFG_OPTLIST);
 }
 
-static char *opt_verusage_and_exit(const char *extra)
-{
+
+static void print_usage(const char *progname) {
 	bfg_versioninfo();
-	printf("%s", opt_usage(opt_argv0, extra));
-	fflush(stdout);
-	exit(0);
+	printf("Usage: %s [OPTIONS]\n", progname);
+	puts("  -c, --config FILE         Load a JSON-format configuration file\n"
+		 "      --default-config      Always load the default config file\n"
+		 "      --no-config           Inhibit loading default config file\n"
+		 "      --no-default-config   Inhibit loading default config file\n"
+		 "  -h, --help               Print this message\n"
+		 "  -V, --version            Display version and exit");
+#ifdef USE_OPENCL
+	puts("  -n, --ndevs              Print number of OpenCL devices");
+#endif
 }
 
 static
@@ -13397,28 +13404,65 @@ int main(int argc, char *argv[])
 	schedstart.tm.tm_sec = 1;
 	schedstop .tm.tm_sec = 1;
 
-	opt_register_table(opt_early_table, NULL);
-	opt_register_table(opt_config_table, NULL);
-	opt_register_table(opt_cmdline_table, NULL);
-	opt_early_parse(argc, argv, applog_and_exit);
-	
-	if (!config_loaded)
-	{
+	// getopt_long option definitions
+	static const struct option long_options[] = {
+		{"config", required_argument, 0, 'c'},
+		{"default-config", no_argument, 0, 1},
+		{"no-config", no_argument, 0, 2},
+		{"no-default-config", no_argument, 0, 3},
+		{"help", no_argument, 0, 'h'},
+		{"version", no_argument, 0, 'V'},
+#ifdef USE_OPENCL
+		{"ndevs", no_argument, 0, 'n'},
+#endif
+		{0, 0, 0, 0}
+	};
+	int opt;
+	int option_index = 0;
+	config_loaded = false;
+	while ((opt = getopt_long(argc, argv, "c:hV" \
+#ifdef USE_OPENCL
+		"n" \
+#endif
+		, long_options, &option_index)) != -1) {
+		switch (opt) {
+		case 'c':
+			load_config(optarg, NULL, NULL);
+			config_loaded = true;
+			break;
+		case 1: // --default-config
+			load_default_config();
+			config_loaded = true;
+			break;
+		case 2: // --no-config
+		case 3: // --no-default-config
+			config_loaded = false;
+			break;
+		case 'h':
+			print_usage(argv[0]);
+			exit(0);
+		case 'V':
+			bfg_versioninfo();
+			exit(0);
+#ifdef USE_OPENCL
+		case 'n':
+			print_ndevs_and_exit(&nDevs);
+			exit(0);
+#endif
+		default:
+			print_usage(argv[0]);
+			exit(1);
+		}
+	}
+	argc -= optind;
+	argv += optind;
+	if (argc > 0) {
+		quit(1, "Unexpected extra commandline arguments");
+	}
+	if (!config_loaded) {
 		load_default_config();
 		rearrange_pools = total_pools;
 	}
-	
-	opt_free_table();
-	
-	/* parse command line */
-	opt_register_table(opt_config_table,
-			   "Options for both config file and command line");
-	opt_register_table(opt_cmdline_table,
-			   "Options for command line only");
-
-	opt_parse(&argc, argv, applog_and_exit);
-	if (argc != 1)
-		quit(1, "Unexpected extra commandline arguments");
 	
 	if (rearrange_pools && rearrange_pools < total_pools)
 	{
